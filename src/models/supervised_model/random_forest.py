@@ -1,57 +1,74 @@
+
+# Imports
 from typing import Tuple, Union
 import numpy as np
 import pandas as pd
-
-from sklearn.pipeline import Pipeline
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn import model_selection
+from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, precision_score, matthews_corrcoef
 
-def random_forest_training_and_prediction(
-    training_data: pd.DataFrame, 
-    test_size: float, 
-    to_predict: pd.DataFrame, 
-    text_column: str = 'review', 
-    output_column: str = 'label_encoded'
-) -> Tuple[np.ndarray, np.ndarray, Union[str, dict], float, Union[float, np.ndarray]]:
+
+# Method for model training and prediction
+def random_forest_training_and_prediction(training_data: pd.DataFrame, test_size: float, to_predict: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, Union[str, dict], float, Union[float, np.ndarray]]:
     """
-    Train and predict with a Random Forest model using TF-IDF for text features.
+    method to train and predict data with random forest model using TF-IDF embedding.
     
-    Args:
-        training_data (pd.DataFrame): DataFrame with training data.
-        test_size (float): Proportion for test split.
-        to_predict (pd.DataFrame): DataFrame for new predictions.
-        text_column (str): Column name with text (default 'review').
-        output_column (str): Column name with labels (default 'label_encoded').
+   Args:
+        training_data (pd.DataFrame): Training data containing at least 'review' and 'label' columns.
+        test_size (float): Proportion of training data to set aside for validation.
+        to_predict (pd.DataFrame): Data that needs to be predicted. Must include a 'review' column.
         
     Returns:
         Tuple containing:
-          - Final predicted labels on new data.
-          - Predicted probabilities on new data.
-          - Classification report on test split.
-          - Matthews correlation coefficient on test split.
-          - Weighted precision score on test split.
+            - final_prediction_rf (np.ndarray): Predicted labels for to_predict.
+            - final_prediction_proba_rf (np.ndarray): Predicted probabilities.
+            - class_report (Union[str, dict]): Classification report from the validation split.
+            - mcc_value (float): Matthews correlation coefficient from the validation split.
+            - precision_score_report (Union[float, np.ndarray]): Weighted precision score from the validation split.
     """
-    pipeline = Pipeline([
-        ('tfidf', TfidfVectorizer()),
-        ('clf', RandomForestClassifier(n_estimators=100, random_state=42))
-    ])
     
-    X = training_data[text_column]
-    y = training_data[output_column].astype(str)
+    # Replace missing reviews with na value
+    training_data['review'] = training_data['review'].fillna("")
+    to_predict['review'] = to_predict['review'].fillna("")
+
+    # Vectorize the training data using TF-IDF embedding technique
+    count_vect = CountVectorizer()
+    X_counts = count_vect.fit_transform(training_data['review'])
     
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=21)
+    tfidf_transformer = TfidfTransformer()
+    vectorized_data = tfidf_transformer.fit_transform(X_counts)
+    matrix = vectorized_data.toarray()
     
-    pipeline.fit(X_train, y_train)
+    # Split data into training and validation sets
+    x_train, x_test, y_train, y_test = model_selection.train_test_split(
+        matrix,
+        training_data['label'].astype(str),
+        test_size=test_size,
+        random_state=21
+    )
     
-    y_pred = pipeline.predict(X_test)
-    class_report = classification_report(y_test, y_pred)
-    precision_score_report = precision_score(y_test, y_pred, average='weighted')
-    mcc_value = matthews_corrcoef(y_test, y_pred)
+    # Train Random Forest classifier
+    rf_clf = RandomForestClassifier(random_state=42, n_estimators=100)
+    rf_clf.fit(x_train, y_train)
     
-    final_prediction = pipeline.predict(to_predict[text_column])
-    final_prediction_proba = pipeline.predict_proba(to_predict[text_column])
+    # Evaluate on the validation set
+    rf_preds = rf_clf.predict(x_test)
+    class_report = classification_report(y_test, rf_preds)
+    precision_score_report = precision_score(y_test, rf_preds, average='weighted')
+    mcc_value = matthews_corrcoef(y_test, rf_preds)
     
-    return final_prediction, final_prediction_proba, class_report, mcc_value, precision_score_report
+    # Transform the to_predict data using the same TF-IDF transformation
+    matrix_for_prediction = count_vect.transform(to_predict['review'])
+    matrix_for_prediction = tfidf_transformer.transform(matrix_for_prediction)
+    
+    # Final predictions and probabilities
+    final_prediction_rf = rf_clf.predict(matrix_for_prediction)
+    final_prediction_proba_rf = rf_clf.predict_proba(matrix_for_prediction)
+    
+    return (final_prediction_rf,
+            final_prediction_proba_rf,
+            class_report,
+            mcc_value,
+            precision_score_report)

@@ -12,7 +12,7 @@ def logistic_regression_training_and_prediction(
     to_predict: pd.DataFrame
 ) -> Tuple[np.ndarray, np.ndarray, Union[str, dict], float, Union[float, np.ndarray]]:
     """
-    Train and predict with a Logistic Regression model using TF-IDF embedding.
+    method to train and predict data with Logistic Regression model using TF-IDF embedding.
     
     Args:
         training_data (pd.DataFrame): Training data containing at least 'review' and 'label' columns.
@@ -60,7 +60,6 @@ def logistic_regression_training_and_prediction(
     # Prepare the prediction data using the same TF-IDF transformation
     matrix_for_prediction = count_vect.transform(to_predict['review'])
     matrix_for_prediction = tfidf_transformer.transform(matrix_for_prediction)
-    matrix_for_prediction = matrix_for_prediction.toarray()
     
     # Make final predictions and compute prediction probabilities
     final_prediction_logistic_regression = lr_clf.predict(matrix_for_prediction)
