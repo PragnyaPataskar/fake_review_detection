@@ -12,7 +12,7 @@ To clone the repository, go to the project directory and open the command prompt
 
 git clone https://github.com/PragnyaPataskar/fake_review_detection.git
 
-# install the dependencies
+# Install the dependencies
 
 pip install -r requirements.txt
 
